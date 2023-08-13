@@ -4,11 +4,13 @@ import re
 import discord
 import sqlite3
 from dotenv import load_dotenv
+from tokens import DISCORD_TOKEN, OPENAI_API_KEY
 import os
 import openai
+from keepalive import keep_alive
 
 
-openai.api_key = "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"
+openai.api_key = OPENAI_API_KEY
 
 intents = discord.Intents.all()
 client = discord.Client(intents=intents)
@@ -97,13 +99,15 @@ async def on_message(message):
             if result:
                 last_lowest_price = result[0]
                 priceDifference = items[0][1]['price'] - last_lowest_price
-                percentChange = (priceDifference / last_lowest_price) * 100
+                basePercentChange = (priceDifference / last_lowest_price) * 100
+                percentChange = round(basePercentChange, 2)
                 response += f"\n\nLast lowest price: ${last_lowest_price}"
                 if (priceDifference < 0):
                     absolutePriceDifference = abs(priceDifference)
-                    response += f"\nThere is a -${absolutePriceDifference} price change for the cheapest option since the last time it was searched"
+                    absolutePercentDifference = abs(percentChange)
+                    response += f"\nThere is a -${absolutePriceDifference}(-{absolutePercentDifference}%) price change for the cheapest option since the last time it was searched"
                 elif (priceDifference > 0):
-                    response += f"\nThere is a +${priceDifference} price change for the cheapest option since the last time it was searched"
+                    response += f"\nThere is a +${priceDifference}(+{percentChange}%) price change for the cheapest option since the last time it was searched"
                 else:
                     response += f"\nThere wasn't a price change for the cheapest option since the last time it was searched"
             
@@ -117,9 +121,9 @@ async def on_message(message):
         openai_response = await generate_openai(user_input)
         await message.channel.send(openai_response)
 
+keep_alive()
 
-
-client.run("MTEzODk1MDQ2NjY1NTQ5ODMxMg.Ga0kBJ.uSLcLLhPjuKLCh-lpvskxgVDw8DvU7uSKUyqm0")
+client.run(DISCORD_TOKEN)
 
 cursor.close()
 conn.close()

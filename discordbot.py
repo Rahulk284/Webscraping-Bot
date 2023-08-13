@@ -3,6 +3,12 @@ import requests
 import re
 import discord
 import sqlite3
+from dotenv import load_dotenv
+import os
+import openai
+
+
+openai.api_key = "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"
 
 intents = discord.Intents.all()
 client = discord.Client(intents=intents)
@@ -19,7 +25,6 @@ cursor.execute('''
 
 conn.commit()
 
-# Web scraper function
 def scrape_newegg(search_term):
     items_found = {}
     url = f"https://www.newegg.com/p/pl?d={search_term}&N=4131"
@@ -56,7 +61,18 @@ def scrape_newegg(search_term):
     sorted_items = sorted(items_found.items(), key=lambda x: x[1]['price'])
     return sorted_items[:3]
 
-# Discord bot event handlers
+async def generate_openai(user_input):
+    try:
+        response = await openai.Completion.create(
+            engine="davinci",
+            prompt=user_input,
+            max_tokens=50
+        )
+        return response.choices[0].text.strip()
+    except Exception as e:
+        print(e)
+        return "An error occurred while generating a response."
+
 @client.event
 async def on_ready():
     print("Bot has logged in as {0.user}".format(client))
@@ -76,7 +92,6 @@ async def on_message(message):
         else:
             response = "\n\n".join([f"{item[0]}\n${item[1]['price']}\n{item[1]['link']}" for item in items])
             
-            # Retrieve last lowest price from the database
             cursor.execute('SELECT lowest_price FROM lowest_prices WHERE search_term = ?', (search_term,))
             result = cursor.fetchone()
             if result:
@@ -92,16 +107,20 @@ async def on_message(message):
                 else:
                     response += f"\nThere wasn't a price change for the cheapest option since the last time it was searched"
             
-            # Update lowest price in the database if necessary
             lowest_price = items[0][1]['price']
             cursor.execute('INSERT OR REPLACE INTO lowest_prices (search_term, lowest_price) VALUES (?, ?)', (search_term, lowest_price))
             conn.commit()
             
             await message.channel.send(response)
+    if message.content.startswith("!ask_bot"):
+        user_input = message.content[9:]
+        openai_response = await generate_openai(user_input)
+        await message.channel.send(openai_response)
 
-client.run("MTEzODk1MDQ2NjY1NTQ5ODMxMg.GRMOkp.-I38Xxw7LYkistfLt9RG2dq-K89uZ7qgQRDaUM")
 
-# Close the database connection
+
+client.run("MTEzODk1MDQ2NjY1NTQ5ODMxMg.Ga0kBJ.uSLcLLhPjuKLCh-lpvskxgVDw8DvU7uSKUyqm0")
+
 cursor.close()
 conn.close()
 
